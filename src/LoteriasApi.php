@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LoteriasApi;
 
+use LoteriasApi\Config\RetryConfig;
 use LoteriasApi\Resources\Results;
 use LoteriasApi\Resources\Draws;
 use InvalidArgumentException;
@@ -29,6 +30,15 @@ use InvalidArgumentException;
  *     extraNumbers: [3, 11]
  * );
  * echo $check['data']['isWinner'] ? 'Winner!' : 'No luck';
+ *
+ * // Disable automatic retries
+ * $api = new LoteriasApi('lat_xxx...', retryConfig: RetryConfig::disabled());
+ *
+ * // Custom retry configuration
+ * $api = new LoteriasApi('lat_xxx...', retryConfig: new RetryConfig(
+ *     maxRetries: 5,
+ *     baseDelayMs: 500
+ * ));
  * ```
  */
 class LoteriasApi
@@ -45,18 +55,20 @@ class LoteriasApi
      * @param string $apiKey Your API key (get one at https://loterias-api.com)
      * @param string $baseUrl Base URL for the API
      * @param int $timeout Request timeout in seconds
+     * @param RetryConfig|null $retryConfig Retry configuration (null = enabled with defaults)
      * @throws InvalidArgumentException if apiKey is empty
      */
     public function __construct(
         string $apiKey,
         string $baseUrl = 'https://api.loterias-api.com/api/v1',
-        int $timeout = 30
+        int $timeout = 30,
+        ?RetryConfig $retryConfig = null
     ) {
         if (empty($apiKey)) {
             throw new InvalidArgumentException('apiKey is required');
         }
 
-        $client = new HttpClient($apiKey, $baseUrl, $timeout);
+        $client = new HttpClient($apiKey, $baseUrl, $timeout, $retryConfig);
 
         $this->results = new Results($client);
         $this->draws = new Draws($client);

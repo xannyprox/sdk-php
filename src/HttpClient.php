@@ -7,10 +7,15 @@ namespace LoteriasApi;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\HandlerStack;
+use LoteriasApi\Config\RetryConfig;
 use LoteriasApi\Exceptions\LoteriasApiException;
+use LoteriasApi\Middleware\RetryMiddleware;
 
 /**
- * Internal HTTP client for making API requests
+ * Internal HTTP client for making API requests.
+ *
+ * Supports automatic retries with exponential backoff for transient failures.
  */
 class HttpClient
 {
@@ -21,12 +26,23 @@ class HttpClient
     public function __construct(
         string $apiKey,
         string $baseUrl = 'https://api.loterias-api.com/api/v1',
-        int $timeout = 30
+        int $timeout = 30,
+        ?RetryConfig $retryConfig = null
     ) {
         $this->apiKey = $apiKey;
         $this->baseUrl = rtrim($baseUrl, '/');
 
+        // Use default retry config if not provided
+        $retryConfig ??= new RetryConfig();
+
+        // Build handler stack with retry middleware
+        $stack = HandlerStack::create();
+        if ($retryConfig->enabled) {
+            $stack->push(RetryMiddleware::create($retryConfig), 'retry');
+        }
+
         $this->client = new Client([
+            'handler' => $stack,
             'base_uri' => $this->baseUrl,
             'timeout' => $timeout,
             'headers' => [
